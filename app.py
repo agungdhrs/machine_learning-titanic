@@ -2,64 +2,41 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
-from utils.predict import load_model, make_prediction
+from utils.predict_survive import load_model
 
-# Muat model prediksi dan encoder
 model = load_model()
-with open('utils/encoders.pkl', 'rb') as file:
-    encoders = pickle.load(file)
+encoders = pickle.load(open('utils/encoders.pkl', 'rb'))
+features = model.feature_names_in_ if hasattr(model, 'feature_names_in_') else ['pclass', 'age', 'sibsp', 'parch', 'fare', 'ticket', 'cabin', 'embarked']
 
-st.title("Prediksi Keselamatan Penumpang Kapal")
+st.title("Titanic Survival")
 
-# Input Form
 nama = st.text_input("Nama")
-pclass = st.selectbox("Kelas Penumpang (Pclass)", [1, 2, 3])
-age = st.number_input("Umur (Age)", min_value=0, max_value=100, value=25)
-sibsp = st.number_input("Jumlah Saudara/Istri/Anak (SibSp)", min_value=0, max_value=10, value=0)
-parch = st.number_input("Jumlah Orang Tua/Anak (Parch)", min_value=0, max_value=10, value=0)
-fare = st.number_input("Tarif Tiket (Fare)", min_value=0.0, max_value=500.0, value=50.0)
-ticket = st.text_input("Nomor Tiket (Ticket)")
-cabin = st.text_input("Kabina (Cabin)")
-embarked = st.selectbox("Pelabuhan Naik (Embarked)", ['C', 'Q', 'S'])
-
-# Data dictionary
 data = {
-    "pclass": pclass,
-    "age": age,
-    "sibsp": sibsp,
-    "parch": parch,
-    "fare": fare,
-    "ticket": ticket,
-    "cabin": cabin,
-    "embarked": embarked
+    "pclass": st.selectbox("Kelas Kapal", [1, 2, 3]),
+    "age": st.number_input("Umur", min_value=0, max_value=100),
+    "sibsp": st.number_input("Jumlah Saudara", min_value=0, max_value=100),
+    "parch": st.number_input("Kerabat", min_value=0, max_value=100),
+    "fare": st.number_input("Biaya Tiket", min_value=0, max_value=100),
+    "ticket": st.text_input("Nomor Tiket"),
+    "cabin": st.text_input("Kabin"),
+    "embarked": st.selectbox("Pelabuhan", ['C', 'Q', 'S'])
 }
 
-# Fungsi transformasi data
-def transform_data(data, encoders):
-    transformed_data = {}
-    for key, value in data.items():
-        if key in encoders:  # Jika kolom memiliki encoder
-            if value not in encoders[key].classes_:
-                # Tambahkan nilai baru sementara ke classes_
-                encoders[key].classes_ = np.append(encoders[key].classes_, value)
-            
-            # Transformasikan nilai ke bentuk numerik
-            transformed_data[key] = encoders[key].transform([value])[0]
-        else:
-            # Jika tidak ada encoder, gunakan nilai asli
-            transformed_data[key] = value
-    return pd.DataFrame([transformed_data])
+def transform_data(data, encoders, features):
+    for k, v in data.items():
+        if k in encoders and v not in encoders[k].classes_:
+            encoders[k].classes_ = np.append(encoders[k].classes_, v)
+        data[k] = encoders[k].transform([v])[0] if k in encoders else v
+    return pd.DataFrame([data])[features]
 
-# Tombol prediksi
-if st.button("Proses Prediksi"):
+if st.button("Proses"):
     try:
-        # Transformasikan data menggunakan encoder
-        input_data = transform_data(data, encoders)
-        
-        # Prediksi hasil
-        result = make_prediction(input_data, model)
-        outcome = "Survive" if result == 1 else "Tidak Survive"
-        
-        st.write(f"Hasil Prediksi: **{outcome}**")
+        if not nama.strip():
+            st.error("Nama tidak boleh kosong")
+        else:
+            input_data = transform_data(data, encoders, features)
+            result = model.predict(input_data.values)
+            outcome = "Tewas" if result[0] == 0 else "Selamat"
+            st.success(f"Hasil: {nama} {outcome}")
     except Exception as e:
-        st.error(f"Terjadi kesalahan: {e}")
+        st.error(f"Kesalahan: {e}")
