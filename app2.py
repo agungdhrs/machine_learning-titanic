@@ -20,7 +20,7 @@ def load_model_and_encoders():
     encoders = joblib.load('utils/encoders.pkl')
     return model, encoders
 
-st.title("Titanic Survival Prediction")
+st.title("Titanic Survival")
 
 uploaded_file = st.file_uploader("Upload file Excel", type=["xls", "xlsx"])
 if uploaded_file:
